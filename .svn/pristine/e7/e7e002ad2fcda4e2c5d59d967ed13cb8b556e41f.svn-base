@@ -1,0 +1,659 @@
+/* 
+Eb163 Flash RPG Webgame Framework
+@author eb163.com
+@email game@eb163.com
+@website www.eb163.com
+*/
+package mapeditor.layers
+{
+	import flash.display.ColorCorrection;
+	import flash.display.Shape;
+	import flash.display.Sprite;
+	import flash.events.Event;
+	import flash.events.MouseEvent;
+	import flash.geom.Point;
+	import flash.net.dns.AAAARecord;
+	import flash.text.TextColorType;
+	import flash.text.TextField;
+	
+	import mapeditor.events.MapEvent;
+	import mapeditor.items.Building;
+	import mapeditor.utils.HashMap;
+	import mapeditor.utils.MapEditorConstant;
+	import mapeditor.utils.MapEditorUtils;
+	
+	import mx.controls.Text;
+	import mx.core.UIComponent;
+	import mx.events.CloseEvent;
+	import mx.utils.ColorUtil;
+	
+	//路点层
+	public class RoadPointLayer extends UIComponent
+	{
+		//绘制圆形路点标记常量标识
+		public static var MARK_CIRCLE:int  = 0;
+		//绘制菱形路点标记常量标识
+		public static var MARK_DIAMOND:int = 1;
+		//绘制带十字线菱形路点标记常量标识
+		public static var MARK_LINE_DIAMOND:int = 2;
+		//路点颜色
+		public static var ROAD_COLOR:uint   = 0x33FF33;
+		//障碍点颜色
+		public static var HINDER_COLOR:uint = 0xFF0033;
+		//事件触发点颜色
+		public static var EVENT_COLOR:uint =0xFFFF00;
+		//设置单元格宽
+		private var _tilePixelWidth:Number;
+		//设置单元格高
+		private var _tilePixelHeight:Number;
+		//一个HashMap 对象，存储所有标记过的路点 
+		private var _childMap:HashMap;
+		//HashMap 对象，存储所有属于建筑物的路点
+		private var _buildingPointMap:HashMap;
+		//网格层
+		private var _gridLayer:GridLayer;
+		//用来区分当前路点层使用的图形标记是圆形还是菱形
+		private var _cellMark:int = RoadPointLayer.MARK_CIRCLE;
+		//绘制路点图形标记的代理函数
+		private var _cellCreater:Function;
+		
+		//private var cicleShape:Sprite;
+		public var shapes:Vector.<Sprite> = new Vector.<Sprite>();
+		public var texts:Vector.<TextField> = new Vector.<TextField>();
+		
+		private var cicleShape:Sprite;
+		private var rectangleShape:Sprite;
+		public var dataIndex :int;
+		private var textField:TextField;
+		public function RoadPointLayer(gridLayer:GridLayer)
+		{
+			_gridLayer = gridLayer;
+			_childMap  = new HashMap();
+			_buildingPointMap = new HashMap();
+			//判断当前路点层使用的图形标记是圆形还是菱形
+			setCellCreater(_cellMark);
+		}
+		
+		//根据类型画出单元格
+		public function drawCell(xIndex:int,yIndex:int,cellType:int):void{
+			
+			var type:int = 0;
+			//如果是路点
+			if(cellType == MapEditorConstant.CELL_TYPE_ROAD){
+				type = MapEditorConstant.CELL_TYPE_ROAD;
+				//如果是障碍
+			}else if(cellType == MapEditorConstant.CELL_TYPE_HINDER){
+				type = MapEditorConstant.CELL_TYPE_HINDER;
+			}else if(cellType == MapEditorConstant.CELL_TYPE_EVENT){
+				type = MapEditorConstant.CELL_TYPE_EVENT;
+//				trace(drawCell,"drawCell");
+			}else{
+				throw new Error("未知单元格类型！");
+			}
+			var p:Point = MapEditorUtils.getPixelPoint(_tilePixelWidth,_tilePixelHeight,xIndex,yIndex);
+			
+			var mapKey:String = xIndex + "," + yIndex;
+			addRoadPoint(type, mapKey, p);
+//			trace("drawCellFcncion");
+		}
+		
+		//将指定单元格设置为初始状态
+		public function resetCell(xIndex:int,yIndex:int):void{
+			var mapKey:String = xIndex + "," + yIndex;
+			var oldCell:*     = _childMap.getValue(mapKey);
+			if(oldCell!=null) {
+				removeChild(oldCell.shape);
+				_childMap.remove(mapKey);
+			}
+		}
+		
+		/**
+		 * 
+		 * originPX, originPY	建筑物元点在地图坐标系中的像素坐标
+		 * building				建筑物显示对象
+		 * walkable 			是否可行走
+		 */
+		public function drawWalkableBuilding(building:Building, originPX:int, originPY:int, wb:Boolean):void
+		{
+			var walkableStr:String = building.configXml.walkable;
+			var wa:Array           = walkableStr.split(",");
+			
+			if (wa == null || wa.length < 2) return;
+			
+			var cellWidth:Number  = this.parentApplication._cellWidth;
+			var cellHeight:Number = this.parentApplication._cellHeight;
+			var row:int           = this.parentApplication._row;
+			var col:int           = this.parentApplication._col;
+			var xtmp:int, ytmp:int;
+			
+			for (var i:int=0; i<wa.length; i+=2)
+			{
+				xtmp = originPX + int(wa[i]);
+				ytmp = originPY + int(wa[i+1]);
+				var pt:Point      = MapEditorUtils.getCellPoint(cellWidth, cellHeight, xtmp, ytmp);
+				var mapKey:String = pt.x + "," + pt.y;
+				
+				if (wb == false)//增加阻挡
+				{
+					if(pt.x >= 0 && xtmp > 0){
+						
+						//将建筑物中的障碍点记录在 _buildingPointMap 中
+						if(!_buildingPointMap.containsKey(mapKey)) _buildingPointMap.put(mapKey, new Point(pt.x, pt.y));
+						
+						drawCell(pt.x,pt.y,MapEditorConstant.CELL_TYPE_HINDER);
+						this.parentApplication._mapArr[pt.y][pt.x] = MapEditorConstant.CELL_TYPE_HINDER;
+					}
+				}
+				else//删除阻挡
+				{
+					if(pt.x >= 0 && xtmp > 0) removeRoadPoint(mapKey, pt);
+				}
+			}
+			
+		}
+		
+		//打开时先画出原来的路点，并标记录有障碍的路点
+		public function drawArr(arr:Array, roadType:int):void{
+			drawRoadPoint(arr, roadType);
+//			trace("drawRoadPointdrawRoadPointdrawRoadPoint");
+		}
+		
+		public function drawRoadPoint(arr:Array, roadType:int):void{      //保存后画的
+//			trace("sssssssss");
+			for(var iy:int=0;iy < arr.length;iy++){
+				for(var ix:int=0;ix < arr[0].length;ix++){
+					var cell:int = arr[iy][ix];
+//					trace("cell",cell);
+					var mapKey:String = ix + "," + iy;
+					if(roadType == MapEditorConstant.TYPE_SAVE_MAP_HINDER){          //储存障碍点
+						if(cell == 1){
+							drawCell(ix,iy,MapEditorConstant.CELL_TYPE_ROAD);
+						}
+						else if(cell == 3){
+//							trace("saveAndShow");
+							drawCell(ix,iy,MapEditorConstant.CELL_TYPE_EVENT);
+						}
+						else if(cell == 2){
+//							trace("!_buildingPointMap.containsKey(mapKey))");
+							if(!_buildingPointMap.containsKey(mapKey)) drawCell(ix,iy,MapEditorConstant.CELL_TYPE_HINDER);
+						}
+					}else if(roadType == MapEditorConstant.TYPE_SAVE_MAP_ROAD){     //储存路点
+						if(cell == 1){
+							drawCell(ix,iy,MapEditorConstant.CELL_TYPE_ROAD);
+						}
+						else if(cell == 3){
+//							trace("saveAndShow");
+							drawCell(ix,iy,MapEditorConstant.CELL_TYPE_EVENT);
+						}
+						else if(cell == 2){
+//							trace("!_buildingPointMap.containsKey(mapKey))");
+							if(!_buildingPointMap.containsKey(mapKey)) drawCell(ix,iy,MapEditorConstant.CELL_TYPE_HINDER);
+						}
+					}
+				}
+			}
+		}
+		
+		protected function addRoadPoint(flag:int, mapKey:String, pt:Point):void{
+			var obj:Object;
+			var cell:Shape;
+			if(_childMap.containsKey(mapKey)){
+				obj = _childMap.getValue(mapKey);
+				//				trace(obj.type ,"obj.type ");
+				//				trace(flag,"flag");
+				if(obj.type != flag){              //如果点击的类型与开始的不一样
+					if(obj.shape.parent == this)removeChild(obj.shape);
+					
+					cell = _cellCreater(flag, pt);
+					addChild(cell);
+					
+					_childMap.remove(mapKey);
+					var newObj:Object = {shape:cell, count:1, type:flag};
+					_childMap.put(mapKey, newObj);
+				}else if(obj.type == flag){           //如果点击的类型与开始的一样
+					if(flag == 2){
+						//trace("flag == 2");
+						obj.count += 1;
+						_childMap.put(mapKey, obj);
+					}else if(flag == 1){
+						//trace("flag == 1");
+						if(obj.shape.parent == this) removeChild(obj.shape);
+						addChild(obj.shape);
+					}
+				}
+				
+			}else{
+				//				trace(flag,"flag");                 //上面部分
+				cell = _cellCreater(flag, pt);
+				addChild(cell);
+				obj = {shape:cell, count:1, type:flag};
+				_childMap.put(mapKey, obj);
+				//				trace(obj.type ,"obj.type ");
+			}
+		}
+		
+		//移除路点
+		protected function removeRoadPoint(mapKey:String, pt:Point):void{
+			var obj:Object = new Object();
+			if(_childMap.containsKey(mapKey)){
+				obj = _childMap.getValue(mapKey);
+				if(obj.type == 1){
+					removeChild(obj.shape);
+					_childMap.remove(mapKey);
+					this.parentApplication._mapArr[pt.y][pt.x] = MapEditorConstant.CELL_TYPE_SPACE;
+					
+				}else if(obj.type == 2){
+					obj.count--;
+					if(obj.count == 0){
+						removeChild(obj.shape);
+						_childMap.remove(mapKey);
+						if(_buildingPointMap.containsKey(mapKey)) _buildingPointMap.remove(mapKey);
+						this.parentApplication._mapArr[pt.y][pt.x] = MapEditorConstant.CELL_TYPE_SPACE;
+						
+					}else{
+						_childMap.put(mapKey, obj);
+					}
+				}
+			}
+		}
+		
+		//绘制圆形的路点标记
+		protected function drawCircleShape(type:int, pt:Point):Shape{
+			var cell:Shape = new Shape();
+			//var cellColor:uint = (type == 1)? RoadPointLayer.ROAD_COLOR:RoadPointLayer.HINDER_COLOR;
+			var cellColor:uint =0;
+			//			trace("drawCircleShapeType",type)
+			if(type == 1){
+				cellColor = RoadPointLayer.ROAD_COLOR;
+			}else if(type == 2){
+				cellColor = RoadPointLayer.HINDER_COLOR
+			}
+			else if(type == 3){
+				cellColor = RoadPointLayer.EVENT_COLOR;
+			}
+			else{
+				throw new Error("未知颜色类型");
+			}
+			cell.graphics.beginFill(cellColor, 0.5);
+			cell.graphics.drawCircle(0, 0, _tilePixelHeight/4);
+			cell.graphics.endFill();
+			cell.x = pt.x;
+			cell.y = pt.y;
+			return cell;
+		}
+		
+		//绘制菱形的路点标记
+		protected function drawDiamondShape(type:int, pt:Point):Shape{
+			var cell:Shape = new Shape();
+			var cellColor:uint = (type == 1)? RoadPointLayer.ROAD_COLOR:RoadPointLayer.HINDER_COLOR;
+			
+			cell.graphics.beginFill(cellColor, 0.3);
+			cell.graphics.moveTo(0, _tilePixelHeight/2);
+			cell.graphics.lineTo(_tilePixelWidth/2, 0);
+			cell.graphics.lineTo(_tilePixelWidth, _tilePixelHeight/2);
+			cell.graphics.lineTo(_tilePixelWidth/2, _tilePixelHeight);
+			cell.graphics.lineTo(0, _tilePixelHeight/2);
+			cell.graphics.endFill();
+			cell.x      = pt.x - _tilePixelWidth/2;
+			cell.y      = pt.y - _tilePixelHeight/2;
+			return cell;
+		}
+		
+		//得到建筑编辑器中的障碍
+		public function drawLineDiamondShape(type:int, pt:Point):Shape{
+			var cell:Shape = new Shape();
+			var cellColor:uint = (type == 1)? RoadPointLayer.ROAD_COLOR:RoadPointLayer.HINDER_COLOR;
+			
+			//外框
+			cell.graphics.lineStyle(1, 0xff0000, 0.6);
+			cell.graphics.moveTo(0, _tilePixelHeight/2);
+			cell.graphics.lineTo(_tilePixelWidth/2, 0);
+			cell.graphics.lineTo(_tilePixelWidth, _tilePixelHeight/2);
+			cell.graphics.lineTo(_tilePixelWidth/2, _tilePixelHeight);
+			cell.graphics.lineTo(0, _tilePixelHeight/2);
+			//里框
+			var hoff:Number = _tilePixelHeight/4;
+			var woff:Number = hoff * _tilePixelWidth / _tilePixelHeight;
+			cell.graphics.moveTo(woff, _tilePixelHeight/2);
+			cell.graphics.lineTo(_tilePixelWidth/2, hoff);
+			cell.graphics.lineTo(_tilePixelWidth-woff, _tilePixelHeight/2);
+			cell.graphics.lineTo(_tilePixelWidth/2, _tilePixelHeight-hoff);
+			cell.graphics.lineTo(woff, _tilePixelHeight/2);
+			//交叉线
+			cell.graphics.moveTo(0, _tilePixelHeight/2);
+			cell.graphics.lineTo(_tilePixelWidth, _tilePixelHeight/2);
+			cell.graphics.moveTo(_tilePixelWidth/2, 0);
+			cell.graphics.lineTo(_tilePixelWidth/2, _tilePixelHeight);
+			
+			cell.x      = pt.x - _tilePixelWidth/2;
+			cell.y      = pt.y - _tilePixelHeight/2;
+			
+			return cell;
+		}
+		
+		protected function setCellCreater(__cellMark:int):void{
+			switch(__cellMark){
+				//圆形路点图形标记模式
+				case RoadPointLayer.MARK_CIRCLE:
+					_cellCreater = drawCircleShape;
+					break;
+				//菱形路点图形标记模式
+				case RoadPointLayer.MARK_DIAMOND:
+					_cellCreater = drawDiamondShape;
+					break;
+				//十字线菱形路点图形标记模式
+				case RoadPointLayer.MARK_LINE_DIAMOND:
+					_cellCreater = drawLineDiamondShape;
+					break;
+			}
+		}
+		
+		public function drawEventCicle():void
+		{
+			cicleShape = new Sprite();
+			cicleShape.graphics.lineStyle(3, 0xFFFF00);
+			cicleShape.graphics.drawCircle(0,0,MapEvent.data.areaRadius);
+			addChild(cicleShape);
+			cicleShape.name = MapEvent.data.areaName;
+			shapes.push(cicleShape);
+			
+			stage.addEventListener(MouseEvent.MIDDLE_CLICK, spriteDown);
+			addEventListener(Event.ENTER_FRAME, moveCicle);
+			//			cicleShape.startDrag(true);
+			
+		}
+		
+		private function moveCicle(event:Event):void
+		{
+			if(MapEvent.data.areaType == "circle"){
+				cicleShape.x = mouseX;
+				cicleShape.y = mouseY;
+			} else if(MapEvent.data.areaType == "rectangle"){
+				rectangleShape.x = mouseX;
+				rectangleShape.y = mouseY;
+			}
+		}
+		
+		
+		public function onRemove(event:MouseEvent):void
+		{
+			var sprite :Sprite =event.target as Sprite
+			
+			this.removeChild(event.target as Sprite);
+			for (var i:int = 0; i < texts.length; i++) 
+			{
+				if(sprite.name==texts[i].name)
+				{  
+					this.removeChild(texts[i]);
+					
+					MapEvent.datas.splice(i,1);
+					MapEvent.npcDatas.splice(i,1);
+					texts.splice(i,1);
+					shapes.splice(i,1);
+//					trace(MapEvent.datas.length);
+				}
+			}
+			
+		}
+		
+		private function spriteDown(event:MouseEvent):void
+		{
+			stage.removeEventListener(MouseEvent.MIDDLE_CLICK, spriteDown);
+			removeEventListener(Event.ENTER_FRAME, moveCicle);
+			
+			textField= new TextField();
+			textField.autoSize = "left";
+			textField.textColor =0xFF0033;
+			textField.text = "刷怪地图:  "+MapEvent.data.areaName+ "\n npcID:  "+MapEvent.npcData.npcID +"\n npc数量:  " +MapEvent.npcData.npcNum;
+			textField.x =mouseX;
+			textField.y =mouseY;
+			textField.name =MapEvent.data.areaName;
+			addChild(textField);
+			texts.push(textField);
+			
+			MapEvent.data.areaX = mouseX;
+			MapEvent.data.areaY = mouseY;
+//			for(var i:int=0;i<texts.length;i++){
+//				trace(texts[i].text,"text");
+//			}
+			//MapEvent.singleDatas.npcListNum = 1;
+			
+//			var ob :Object = new Object();
+//			ob.npcID = MapEvent.npcData.npcID;
+//			ob.npcNum = MapEvent.npcData.npcID;
+			
+			//MapEvent.data.push(ob);
+			
+			//将值引用转换为数引用
+			
+			//			var ob :Object = new Object();
+			//			ob.areaType = MapEvent.singleDatas[0].areaType
+			//			ob.areaID  = MapEvent.singleDatas[0].areaID
+			//			ob.areaName  = MapEvent.singleDatas[0].areaName
+			//			ob.areaWidth  = MapEvent.singleDatas[0].areaWidth
+			//			ob.areaHeight  = MapEvent.singleDatas[0].areaHeight
+			//			ob.areaX  = mouseX
+			//			ob.areaY  = mouseY
+			//		    ob.npcID = MapEvent.npcData.npcID
+			//			ob.npcNum = MapEvent.npcData.npcID
+//			var temp :Array = new Array();
+//			
+			MapEvent.datas.push(MapEvent.data); 
+			MapEvent.npcArr=[];
+			MapEvent.npcArr.push(MapEvent.npcData);
+			MapEvent.npcDatas.push(MapEvent.npcArr);
+//			trace(MapEvent.npcDatas[0]);
+			
+			MapEvent.dispatcher.addEventListener(MapEvent.CANCEL_EVENT, cancelCicle);
+			MapEvent.dispatcher.addEventListener(MapEvent.MENU_CANCEL_SELECT, menuCancel);
+		}		
+		
+		public function menuCancel(event:Event):void
+		{
+			for (var i:int = 0; i < texts.length; i++) 
+			{
+				shapes[i].removeEventListener(MouseEvent.CLICK, onRemove);
+			}
+		}
+		
+		public function cancelCicle(event:Event):void
+		{
+			for (var i:int = 0; i < texts.length; i++) 
+			{
+				shapes[i].addEventListener(MouseEvent.CLICK, onRemove);
+				
+			}
+			
+			stage.removeEventListener(MouseEvent.MOUSE_DOWN, onDragShape);
+			stage.removeEventListener(MouseEvent.MIDDLE_CLICK, onAddNpc);
+		}
+		
+		
+		
+		public function drawEventRectangle():void
+		{
+			rectangleShape = new Sprite();
+			rectangleShape.graphics.lineStyle(3, 0xFFFF00);
+			rectangleShape.graphics.drawRect(0,0,MapEvent.data.areaWidth,MapEvent.data.areaHeight);
+			addChild(rectangleShape);
+//			trace("MapEvent.data.areaName",MapEvent.data.areaName);
+			rectangleShape.name = MapEvent.data.areaName;
+			shapes.push(rectangleShape);
+			
+			stage.addEventListener(MouseEvent.MIDDLE_CLICK, spriteDown);
+			addEventListener(Event.ENTER_FRAME, moveCicle);
+			
+		}
+		
+		
+		
+		/**
+		 *增加怪物 
+		 * 
+		 */		
+		public function addNpc():void
+		{
+			for (var i:int = 0; i < texts.length; i++) 
+			{
+				shapes[i].removeEventListener(MouseEvent.CLICK, onRemove);
+				
+			}
+			stage.removeEventListener(MouseEvent.MOUSE_DOWN, onDragShape);
+			stage.addEventListener(MouseEvent.MIDDLE_CLICK, onAddNpc);
+//			trace("addNpc");
+		}
+		
+		private function onAddNpc(event:MouseEvent):void
+		{
+			var ob :Object = new Object();
+			for (var i:int = 0; i < MapEvent.datas.length; i++) 
+			{
+				ob = MapEvent.datas[i];
+				
+				if(ob.areaType == "circle")
+				{
+					//trace("event.stageX","event.stageY",event.localX ,event.localY,ob.areaX,ob.areaY );
+					
+					if(Math.abs(mouseX-ob.areaX)  < ob.areaRadius-20  &&
+						Math.abs(mouseY -ob.areaY)  < ob.areaRadius-20 )
+					{   dataIndex = i;
+				//		texts[i].text="shuidfskjf";
+						MapEvent.dispatcher.dispatchEvent( new Event(MapEvent.ADD_NPC));
+					}
+					
+				}else if(ob.areaType == "rectangle"){
+					//trace("event.stageX","event.stageY",event.localX ,event.localY,ob.areaX,ob.areaY,ob.areaWidth);
+					
+					if(0　<  mouseX - ob.areaX && mouseX - ob.areaX  < ob.areaWidth  &&
+						0 <　mouseY - ob.areaY &&  mouseY - ob.areaY < ob.areaHeight )
+					{   dataIndex = i;
+						//MapEvent.datas.
+						MapEvent.dispatcher.dispatchEvent( new Event(MapEvent.ADD_NPC));
+					}
+				}
+			}
+			
+		}
+		
+		/**
+		 *将增加npc的信息存入 
+		 * 
+		 */		
+		public function addNpcData():void
+		{
+//			var ob :Object = new Object();
+//			ob.npcID = MapEvent.npcData.npcID;
+//			ob.npcNum = MapEvent.npcData.npcNum;
+//			MapEvent.npcDatas[dataIndex].npcID=MapEvent.npcData.npcID;
+//			MapEvent.npcDatas[dataIndex].npcNum= MapEvent.npcData.npcNum;
+//			texts[dataIndex].text+="\n";
+//			trace("dataIndex",dataIndex);
+			//MapEvent.npcDatas[dataIndex+1].push(ob);
+//			trace("MapEvent.npcDatas[dataIndex]",MapEvent.npcDatas[0]);
+//			trace(dataIndex,"dataIndex");
+//			trace(MapEvent.npcDatas[dataIndex],"MapEvent.npcDatas[dataIndex]");
+			MapEvent.npcDatas[dataIndex].push(MapEvent.npcData);
+			
+			texts[dataIndex].text+="\n npcID:  "+MapEvent.npcData.npcID+"\n npc数量:  "+MapEvent.npcData.npcNum;
+		}
+		
+		
+		/**
+		 *移动事件 
+		 * 
+		 */		
+		public function moveEvent():void
+		{
+			for (var i:int = 0; i < texts.length; i++) 
+			{
+				shapes[i].removeEventListener(MouseEvent.CLICK, onRemove);
+				
+			}
+			
+			stage.addEventListener(MouseEvent.MOUSE_DOWN, onDragShape);
+			stage.removeEventListener(MouseEvent.MIDDLE_CLICK, onAddNpc);
+			trace("moveEvent");
+		}
+		
+		//++++++++++++++++判断并开始拖拽
+		private function onDragShape(event:MouseEvent):void
+		{
+			
+			var ob :Object = new Object();
+			for (var i:int = 0; i < MapEvent.datas.length; i++) 
+			{
+				ob = MapEvent.datas[i];
+				
+				if(ob.areaType == "circle")
+				{
+					//trace("event.stageX","event.stageY",event.localX ,event.localY,ob.areaX,ob.areaY );
+					
+					if(Math.abs(mouseX-ob.areaX)  < ob.areaRadius-20  &&
+						Math.abs(mouseY -ob.areaY)  < ob.areaRadius-20 )
+					{   dataIndex = i;
+						stage.addEventListener(MouseEvent.MOUSE_UP ,onStopDrag);
+						addEventListener(Event.ENTER_FRAME, onDragMoveShape);
+					}
+					
+				}else if(ob.areaType == "rectangle"){
+					//trace("event.stageX","event.stageY",event.localX ,event.localY,ob.areaX,ob.areaY,ob.areaWidth);
+					
+					if(0　<  mouseX - ob.areaX && mouseX - ob.areaX  < ob.areaWidth  &&
+						0 <　mouseY - ob.areaY &&  mouseY - ob.areaY < ob.areaHeight )
+					{   dataIndex = i;
+						stage.addEventListener(MouseEvent.MOUSE_UP ,onStopDrag);
+						addEventListener(Event.ENTER_FRAME, onDragMoveShape);
+					}
+				}
+			}
+			
+		}
+		//+++++++++++++++++停止拖拽
+		private function onStopDrag(event:MouseEvent):void
+		{
+			
+			MapEvent.datas[dataIndex].areaX = mouseX;
+			MapEvent.datas[dataIndex].areaY = mouseY;
+			stage.removeEventListener(MouseEvent.MOUSE_UP ,onStopDrag);
+			removeEventListener(Event.ENTER_FRAME, onDragMoveShape);
+			trace("onStopDrag");
+			
+		}		
+		
+		//+++++++++++++++++++拖拽时移动shape
+		private function onDragMoveShape(e:Event):void
+		{
+			trace("mouseX",shapes[dataIndex].x,mouseX,shapes[dataIndex].y,mouseY, dataIndex);
+			shapes[dataIndex].x = mouseX;
+			shapes[dataIndex].y = mouseY;
+			texts[dataIndex].x = mouseX;
+			texts[dataIndex].y = mouseY;
+			
+		}
+		
+		//========getter and setter
+		public function set cellWidth(cellWidth:Number):void{
+			this._tilePixelWidth = cellWidth;
+		}
+		
+		public function get cellMark():int {
+			return _cellMark;
+		}
+		public function set cellMark(val:int):void{
+			_cellMark = val;
+			setCellCreater(_cellMark);
+		}
+		
+		public function get cellWidth():Number{
+			return this._tilePixelWidth;
+		}
+		
+		public function set cellHeight(cellHeight:Number):void{
+			this._tilePixelHeight = cellHeight;
+		}
+		
+		public function get cellHeight():Number{
+			return this._tilePixelHeight;
+		}
+	}
+}

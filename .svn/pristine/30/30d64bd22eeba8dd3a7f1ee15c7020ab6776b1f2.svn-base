@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" width="288" height="184">
+	<s:layout>
+		<s:FormItemLayout/>
+	</s:layout>
+	
+	<fx:Script>
+		<![CDATA[
+			import mapeditor.events.MapEvent;
+			
+			import mx.controls.Alert;
+			private function cancel(event:MouseEvent):void
+			{
+				trace("dispatchEvent( new Event(MapEvent.NPC_PANEL_PRESS_CANCEL)");
+				MapEvent.dispatcher.dispatchEvent( new Event(MapEvent.NPC_PANEL_PRESS_CANCEL));
+			}
+			
+			private function enter(event:MouseEvent):void
+			{
+				if(!npcID.text) Alert.show("未输入npcID");
+				if(!npcNum.text) Alert.show("未输入npcNum");
+				if(int(npcNum.text) == 0) Alert.show("输入类型错误，请输入数字");
+				if(npcID.text && npcNum.text && int(npcNum.text) != 0)
+				{
+					var ob :Object = new Object();
+					ob.npcID = npcID.text;
+					ob.npcNum = npcNum.text;
+					
+					MapEvent.npcData = ob;
+					
+					MapEvent.dispatcher.dispatchEvent( new Event(MapEvent.NPC_PANEL_PRESS_OK));
+				}
+				
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+	</fx:Declarations>
+	<s:Label width="50" height="20" text="怪物ID"/>
+	<s:Panel width="289" height="186" fontSize="15"
+			 title="                在区域中增加NPC">
+		<s:Label x="194" y="16" width="50" height="20" text="怪物ID"/>
+		<s:Label x="194" y="72" width="83" height="20" text="怪物Num"/>
+		<s:TextInput id="npcID" x="10" y="14"/>
+		<s:TextInput id="npcNum" x="10" y="70"/>
+		<s:Button id="cancelButton" x="27" y="122" label="取消" click="cancel(event)"/>
+		<s:Button id="oKButton" x="174" y="122" label="确定" click="enter(event)"/>
+	</s:Panel>
+</s:Group>

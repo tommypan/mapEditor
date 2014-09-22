@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<npcs>
+	<npc npcId="1001">
+		<npcName> 黑熊精</npcName>
+	</npc>
+	<npc npcId="1002">
+		<npcName> 螳螂怪</npcName>
+	</npc>
+	<npc npcId="1003">
+		<npcName> 铁头狼</npcName>
+	</npc>
+	<npc npcId="1004">
+		<npcName> 蛇妖</npcName>
+	</npc>
+	<npc npcId="1005">
+		<npcName>妖猴</npcName>
+	</npc>
+	<npc npcId="1006">
+		<npcName>xxxx</npcName>
+	</npc>
+	<npc npcId="1007">
+		<npcName>dfhhd</npcName>
+
+	</npc>
+</npcs>

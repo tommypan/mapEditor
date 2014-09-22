@@ -1,0 +1,235 @@
+<?xml version="1.0" encoding="utf-8"?>
+<InfoPanel xmlns="*" 
+	xmlns:mx="http://www.adobe.com/2006/mxml" width="320" height="420"
+	creationComplete="initPanel(event)"
+	title="地图元件库"
+	>
+	
+	<mx:Script>
+		<![CDATA[
+			import mapeditor.utils.ImageLoader;
+			import mapeditor.utils.MapEditorConstant;
+			import mapeditor.items.Building;
+			import mx.core.WindowedApplication;
+			import mx.events.CloseEvent;
+			import mx.controls.Alert;
+			import mapeditor.events.MapEditorEvent;
+			import mx.managers.PopUpManager;
+			import mapeditor.utils.MapEditorConstant;
+
+			private var _currentLibType:String;//库的模式 file:文件模式 res:swf资源模式
+			private var _configXml:XML;//配置XML文件
+			private var _configFile:File;//配置XML文件
+			private var _itemXml:XML;
+			private var _libHome:File;
+			private var _itemId:int = 0;
+			
+			
+			private var _imagesFilter:FileFilter = new FileFilter("image", "*.jpg;*.gif;*.png");//文件类型过滤
+			
+			private var _newImageLibPanel:NewImageLibPanel;//新建目录弹出窗口
+			
+			//初始化面板
+			private function initPanel(evet:Event):void{
+				_libHome = MapEditorConstant.COMPONENT_LIB_HOME;
+				_configFile= _libHome.resolvePath("hfImgLib.xml");
+				if(_configFile.exists == false){
+					_configXml = <lib><itemId>0</itemId></lib>;
+					writeConfig();
+				}else{
+					var fs:FileStream = new FileStream();
+					fs.open(_configFile, FileMode.READ);
+					_configXml = XML(fs.readUTFBytes(fs.bytesAvailable));
+				}
+				libTree.directory = _libHome;
+				_currentLibType = "dir";
+			}
+			
+			//弹出输入新建目录名称panel
+			private function newLib(evet:Event):void{
+				_newImageLibPanel = NewImageLibPanel(PopUpManager.createPopUp(this,NewImageLibPanel,true));
+				PopUpManager.centerPopUp(_newImageLibPanel);
+				_newImageLibPanel.addEventListener(MapEditorEvent.NEW_IMAGELIB_SUBMIT,createNewLib); 
+			}
+			
+			//新建目录
+			private function createNewLib(evet:MapEditorEvent):void{
+				_newImageLibPanel.removeEventListener(MapEditorEvent.NEW_IMAGELIB_SUBMIT,createNewLib);
+				var newLibName:String = evet.newName;
+				var newD:File = _libHome.resolvePath(newLibName);
+				newD.createDirectory();
+				PopUpManager.removePopUp(_newImageLibPanel);
+				libTree.refresh();
+				
+			}
+			//删除提示
+			private function delLib(evet:Event):void{
+				var selectFile:File = File(libTree.selectedItem);
+				Alert.okLabel = "确定";
+				Alert.cancelLabel = "取消";
+				if(selectFile != null){
+					Alert.show("确定删除[" + selectFile.name + "]", "", Alert.OK | Alert.CANCEL, null, delItem, null, Alert.CANCEL);
+				}else{
+					Alert.show("请单击选择要删除的项目！");
+				}
+				//删除方法
+				function delItem(event:CloseEvent):void{
+					if (event.detail==Alert.CANCEL)
+					{
+	                    return;
+	    			}
+	                //声明选中文件：文件=文件（树形控件ID.选中的文件）
+					var selectFile:File = File(libTree.selectedItem);
+					var index:int;
+					//如果选中文件是文件夹
+					if (selectFile.isDirectory)
+					{
+						//删除文件夹
+						selectFile.deleteDirectory(true);
+					} else {
+						//修改文件
+						//删除 控制XML.xml文件的
+						trace("_configXml.item.@type!=NPC",_configXml.item.@type);
+//						if(_configXml.item.@type!="NPC"){
+						delete _configXml.item.(@file==MapEditorConstant.IMAGE_PATH + _libHome.getRelativePath(selectFile))[0];	//与上面注释代码等同
+						selectFile.deleteFile();
+						//把xml数据写入xml文件
+						writeConfig();
+//						}
+					}
+					libTree.refresh();
+				}
+			}
+			
+			//FileSystemTree 的 change 事件
+			private function fileTreeChange(event:Event):void
+			{
+				var selectFile:File = File(libTree.selectedItem);
+				if (selectFile.isDirectory)
+				{
+					
+				} else {
+					//预览图片
+					imgPrvImg.source = selectFile.nativePath;	
+					var rp:String = _libHome.getRelativePath(selectFile);//选择图片的相对路径
+					_itemXml = _configXml.item.(@file==MapEditorConstant.IMAGE_PATH + rp)[0];
+					//设置画笔
+					var loader:ImageLoader = new ImageLoader();
+					loader.load(selectFile.url);
+					loader.addEventListener(Event.COMPLETE, setBrushBitmapData);
+					
+				}
+			}
+			//设置主界面画笔图像
+			private function setBrushBitmapData(evet:Event):void{
+				var buildBrush:Building = this.parentApplication._buildBrush;
+				if (buildBrush == null)
+				{
+					buildBrush = new Building();
+				}
+//				buildBrush.setBitMap(evet.target._data);
+				buildBrush.reset(evet.target.data,_itemXml);
+				//Alert.show(_itemXml.@type);
+				this.parentApplication._buildBrush      = buildBrush;
+				this.parentApplication._buildBrush.init = true;
+			}
+			
+			//导入图片
+			private function impotPic(evet:Event):void{
+			    if (libTree.selectedItem == null)
+			    {
+			    	Alert.show("请先选择要导入图片的目录!");
+			    }else{
+					var directory:File = File.documentsDirectory;
+				    directory.browseForOpenMultiple("选择图片文件", [_imagesFilter]);
+				    directory.addEventListener(FileListEvent.SELECT_MULTIPLE, addPic);
+			    }
+			}
+			
+			//加入图片
+			private function addPic(event:FileListEvent):void 
+			{
+				var fa:Array = event.files;
+				_itemId = _configXml.itemId[0];
+			    for each(var openFile:File in fa){
+				    var nowFile:File = File(libTree.selectedItem);
+				    var destFile:File;
+				    if(nowFile.isDirectory){
+				    	destFile = nowFile.resolvePath(openFile.name)
+				    }else{
+				    	destFile = nowFile.parent.resolvePath(openFile.name);
+				    }
+				    if(destFile.exists){
+				    	Alert.show("该目录下已有 " + openFile.name + " 文件！此文件未导入！");
+				    }else{
+					    openFile.copyTo(destFile, false);
+			    		var xmlItem:XML = <item id={_itemId} file={MapEditorConstant.IMAGE_PATH + _libHome.getRelativePath(destFile)} />;
+			    		xmlItem.@type = "";
+			    		_configXml.appendChild(xmlItem);
+			    		_itemId++;
+			    		_configXml.itemId[0] = _itemId;
+				    }
+			    }
+				libTree.refresh();
+				writeConfig();
+			}
+			
+			//写入配置文件
+			private function writeConfig():void{
+			    var xmlFileStream:FileStream = new FileStream();
+			    xmlFileStream.open(_configFile, FileMode.WRITE);
+			    xmlFileStream.writeUTFBytes(_configXml.toXMLString());
+			    xmlFileStream.close();
+//			    HeptaFishGC.gc();
+			}
+			
+			//编辑建筑
+			private function editBuild(evet:Event = null):void{
+				var selectFile:File = File(libTree.selectedItem);
+				if (selectFile.isDirectory)
+				{
+					return;
+				}
+				
+				// 设置当前材质类为包含选择文件的文件夹
+				var rp:String = _libHome.getRelativePath(selectFile);//选择图片的相对路径
+//				var imgId:int = this.imgLibXML.item.(file==rp).id;		//选择图片的id
+				var imgId:int = _configXml.item.(@file==MapEditorConstant.IMAGE_PATH + rp).@id;		//选择图片的id
+				
+//				var editLibItem:EditBuild = EditBuild(PopUpManager.createPopUp(WindowedApplication(this.parentApplication), EditBuild, true, null));
+////				editLibItem.x = (this.parentApplication.mainCanvas.width - editLibItem.width)/2 - 5;
+////              editLibItem.y = (this.parentApplication.mainCanvas.height - editLibItem.height);
+//				editLibItem.imgId = imgId;
+//				editLibItem.selectFile = selectFile;
+//				editLibItem.relativePath = rp;
+//				editLibItem.imgLibXML = _configXml.copy();
+//				editLibItem.addEventListener(MapEditorEvent.EDIT_BUILD_SUBMIT, editBuildFinish);
+//				if(this.parentApplication._gridLayer.visible)
+//					this.parentApplication._gridLayer.visible = false;
+//				if(this.parentApplication._mapLayer.visible)
+//					this.parentApplication._mapLayer.visible = false;
+			}
+//			
+			//编辑建筑保存
+			private function editBuildFinish(e:MapEditorEvent):void{
+				_configXml = e.buildXml.copy();
+				var buildBrush:Building = this.parentApplication._buildBrush;
+				buildBrush.configXml = e.nowBuildXML;
+				writeConfig();
+				
+//				HeptaFishGC.gc();
+			}
+			
+			
+			
+		]]>
+	</mx:Script>
+
+	<mx:Image id="imgPrvImg" width="160" height="90" autoLoad="true" scaleContent="true" x="80" y="31"/>
+	<mx:FileSystemTree backgroundAlpha="0.3" id="libTree" x="10" y="129" height="206" doubleClick="{editBuild()}"  extensions="['.gif','.jpg','.png']" change="{fileTreeChange(event)}" width="280"/>
+	<mx:Button id="btn_newLib" x="10" y="343" label="新建目录" click="{newLib(event)}"/>
+	<mx:Button id="btn_impotImage" x="88" y="343" label="导入图片" click="{impotPic(event)}"/>
+	<mx:Button id="btn_edit" x="166" y="343" label="编辑" click="{editBuild()}" />
+	<mx:Button id="btn_delLib" x="236.7" y="343" label="删除" click="delLib(event)"/>
+	
+</InfoPanel>

@@ -1,0 +1,9 @@
+<map filename="maps/test1/logo.png" name="test1" mapwidth="60" mapheight="30" loadType="0" sliceWidth="60" sliceHeight="30" preloadX="2" preloadY="2" roadType="1">
+  <floor tileWidth="60" tileHeight="30" row="2" col="1">1,1</floor>
+  <items/>
+  <areas>
+    <area areaType="circle" areaID="3" areaName="AFG" areaRadius="45" areaX="166" areaY="173">
+      <npc npcType="npcName" npcID="q" npcNum="34"/>
+    </area>
+  </areas>
+</map>

@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Panel xmlns:mx="http://www.adobe.com/2006/mxml" 
+	layout="absolute" width="200" height="204" 
+	xmlns:flexlib="http://code.google.com/p/flexlib/"
+	creationComplete="initPanel(event)" verticalScrollPolicy="off"
+	creationCompleteEffect="{showEffect}"
+	showEffect="{showEffect}" hideEffect="{removeEffect}" styleName="panel" backgroundAlpha="0.3">
+	
+	<mx:Style>
+		.panel{
+			color:#000000;
+			font-weight:bold;
+			backgroundAlpha:0.3;
+		}
+	</mx:Style>
+	
+	<mx:Fade alphaFrom="1" alphaTo="0" duration="1000" id="removeEffect" />
+	<mx:Fade alphaFrom="0" alphaTo="1" duration="1000" id="showEffect" />
+	<mx:Script>
+		<![CDATA[
+			import mx.controls.Image;
+			import mx.managers.PopUpManager;
+			
+			private var _show:Boolean = true;//是否显示
+			
+			[Embed(source="images/icons/panelClose.png")]
+			private var closePic:Class;//关闭按钮图片
+			private var closeImage:Image;
+			
+			
+			[Embed(source="images/icons/panelHide.png")]
+			private var hidePic:Class;//最小化按钮图片
+			private var hideImage:Image;
+			
+			[Embed(source="images/icons/panelShow.png")]
+			private var showPic:Class;//最大化按钮图片
+			private var showImage:Image;
+			
+			[Bindable]
+			private var oldHeight:Number;
+			
+			
+			//重载方法 加入titlebar按钮
+			override protected function createChildren():void
+			{
+				super.createChildren();
+	             
+				closeImage = new Image();
+				closeImage.data = new closePic();
+				closeImage.toolTip = "关闭";
+				
+				hideImage = new Image();
+				hideImage.data = new hidePic();
+				hideImage.toolTip = "最小化";
+				
+				showImage = new Image();
+				showImage.data = new showPic();
+				showImage.toolTip = "最大化";
+								
+				titleBar.addChild(hideImage);
+				titleBar.addChild(showImage);
+				titleBar.addChild(closeImage);
+			}
+			
+			override protected function updateDisplayList (unscaledWidth:Number, unscaledHeight:Number):void
+			{
+				super.updateDisplayList(unscaledWidth, unscaledHeight);
+				
+				showImage.width = 14;
+				showImage.height = 14;	
+				hideImage.width = 14;
+				hideImage.height = 14;
+				closeImage.width = 14;
+				closeImage.height = 14;
+				closeImage.y = 5;
+				closeImage.x = this.width - 21;
+				hideImage.y = 5;
+				hideImage.x = this.width - 39;
+				showImage.y = 5;
+				showImage.x = this.width - 57;/**/
+			} 
+			
+			
+			
+			
+			//初始化PANEL
+			private function initPanel(evet:Event):void{
+				closeImage.addEventListener(MouseEvent.MOUSE_DOWN,closePanel);
+				hideImage.addEventListener(MouseEvent.MOUSE_DOWN,hidePanelFun);
+				showImage.addEventListener(MouseEvent.MOUSE_DOWN,showPanelFun);
+				oldHeight = this.height;
+			}
+			
+			
+			//关闭面板
+			private function closePanel(evet:Event):void{
+				if(this.visible){
+					this.visible = false;
+				}
+			}
+			
+			//收起面板
+			private function hidePanelFun(evet:Event):void{
+				if(_show){
+					hidePanel.play();
+					_show = false;
+				}
+			}
+			
+			//显示面板
+			private function showPanelFun(evet:Event):void{
+				if(!_show){
+					showPanel.play();
+					_show = true;
+				}
+			}
+		]]>
+	</mx:Script>
+	
+	<mx:Sequence id="showPanel" target="{this}">
+		<mx:Resize duration="1000" heightFrom="35" heightTo="{oldHeight}" />
+		<mx:Fade duration="1000" alphaFrom="0.5" alphaTo="1" />
+	</mx:Sequence>
+	<mx:Sequence id="hidePanel" target="{this}">
+		<mx:Resize duration="1000" heightFrom="{this.height}" heightTo="35" />
+		<mx:Fade duration="1000" alphaFrom="1" alphaTo="0.5" />
+	</mx:Sequence>
+	
+	
+</mx:Panel>

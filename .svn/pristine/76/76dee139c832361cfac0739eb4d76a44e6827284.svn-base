@@ -1,0 +1,25 @@
+package mapeditor.events
+{
+	import flash.events.Event;
+	import flash.events.EventDispatcher;
+
+	public class MapEvent extends Event
+	{
+		public static var dispatcher :EventDispatcher = new EventDispatcher();
+		public static const NPC_PANEL_PRESS_OK:String ="NPC_PANEL_PRESS_OK";
+		public static const NPC_PANEL_PRESS_CANCEL:String ="NPC_PANEL_PRESS_CANCEL";
+		public static const CANCEL_EVENT:String ="CANCEL_EVENT";
+		public static const MENU_CANCEL_SELECT:String ="MENU_CANCEL_SELECT";
+		
+		public static var data :Object
+		//public static var datas :Vector.<Object> = new Vector.<Object>();
+		public static var datas :Array = new Array();
+		
+		public function MapEvent(type:String,data_:Object=null)
+		{
+			super(type,data_);
+			data_ && (data = data_);
+		}
+
+	}
+}

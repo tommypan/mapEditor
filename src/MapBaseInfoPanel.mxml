@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<InfoPanel xmlns="*" 
+	xmlns:mx="http://www.adobe.com/2006/mxml" 
+	height="198" width="225" title="地图基本信息" titleStyleName="panelTitle"
+	>
+	
+	<mx:Style>
+		.panelTitle{
+			color:#000000;
+		}
+	</mx:Style>
+	
+	<mx:Script>
+		<![CDATA[
+		
+			[Bindable]
+			private var _mapWidth:String;
+			[Bindable]
+			private var _mapHeight:String;
+			[Bindable]
+			private var _mapName:String;
+			[Bindable]
+			private var _col:String;
+			[Bindable]
+			private var _row:String;
+			[Bindable]
+			private var _cellW:String;
+			[Bindable]
+			private var _cellH:String;
+			[Bindable]
+			private var _loadType:String;
+			
+			//填充内容信息
+			public function createContent(obj:Object):void{
+				_mapWidth = obj.mapWidth + "";
+				_mapHeight = obj.mapHeight + "";
+				_mapName = obj.mapName + "";
+				_col = obj.col + "";
+				_row = obj.row + "";
+				_cellW = obj.cellW + "";
+				_cellH = obj.cellH + "";
+				var loadType:String = obj.loadType;
+				if(loadType == "0"){
+					_loadType = "单一文件模式";
+				}else if(loadType == "1"){
+					_loadType = "栅格文件模式";
+				}
+			}
+			
+		]]>
+	</mx:Script>
+	
+	<mx:Label x="10" y="10" text="地图名称："/>
+	<mx:Label x="10" y="36" text="宽："/>
+	<mx:Label x="90" y="36" text="高："/>
+	<mx:Text id="mapWidth" x="43" y="36" text="{_mapWidth}"/>
+	<mx:Text id="mapHeight" x="118" y="36" text="{_mapHeight}"/>
+	<mx:Text id="mapName" x="73" y="10" text="{_mapName}"/>
+	<mx:Label x="10" y="62" text="网格宽度："/>
+	<mx:Text id="cellW" x="73" y="62" text="{_cellW}"/>
+	<mx:Text id="col" x="73" y="88" text="{_col}"/>
+	<mx:Label x="103" y="62" text="网格高度："/>
+	<mx:Text id="cellH" x="158" y="62" text="{_cellH}"/>
+	<mx:Text id="row" x="158" y="88" text="{_row}"/>
+	<mx:Label x="10" y="88" text="横向节点："/>
+	<mx:Label x="103" y="88" text="纵向节点："/>
+	<mx:Label x="10" y="114" text="地图载入模式："/>
+	<mx:Text id="loadTypeEle" x="97" y="114" text="{_loadType}"/>
+	
+</InfoPanel>

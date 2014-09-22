@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Panel xmlns:mx="http://www.adobe.com/2006/mxml" 
+	layout="absolute" width="250" height="180" title="输入目录名称" titleStyleName="panelTitle">
+	<mx:Style>
+		.panelTitle{
+			color : #000000;
+		}
+	</mx:Style>
+	
+	<mx:Script>
+		<![CDATA[
+			import mapeditor.events.MapEditorEvent;
+			import mx.controls.Alert;
+			import mx.managers.PopUpManager;
+			//取消
+			private function cancelThis(evet:Event):void{
+				PopUpManager.removePopUp(this);
+			}
+			//提交
+			private function submitThis(evet:Event):void{
+				if(newName.text == null || newName.text == ""){
+					Alert.show("请输入目录名称！");
+				}else{
+					var e:MapEditorEvent = new MapEditorEvent(MapEditorEvent.NEW_IMAGELIB_SUBMIT);
+					e.newName = newName.text;
+					dispatchEvent(e);
+				}
+			}
+		]]>
+	</mx:Script>
+	
+	<mx:Label x="34" y="49" text="目录名称："/>
+	<mx:TextInput id="newName" x="107" y="47" width="80"/>
+	<mx:Button x="34" y="92" label="确定" click="submitThis(event)"/>
+	<mx:Button x="139" y="92" label="取消" click="cancelThis(event)"/>
+</mx:Panel>

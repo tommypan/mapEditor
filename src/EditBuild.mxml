@@ -1,0 +1,498 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Panel xmlns:mx="http://www.adobe.com/2006/mxml" creationComplete="main();" 
+	layout="absolute"
+	backgroundAlpha="0.1"
+	width="628" height="550"
+	borderColor="#9893E4" borderThicknessBottom="2" 
+	borderThicknessLeft="2" borderThicknessRight="2" backgroundColor="#E2E2E2" 
+	borderAlpha="100" title="编辑建筑" fontSize="13">
+	<mx:Script>
+		<![CDATA[
+			import mapeditor.events.MapEditorEvent;
+			import mapeditor.layers.DragRect;
+			import mapeditor.layers.GridLayer;
+			import mapeditor.layers.RoadPointLayer;
+			import mapeditor.utils.ImageLoader;
+			import mapeditor.utils.MapEditorConstant;
+			import mapeditor.utils.MapEditorUtils;
+			
+			import mx.controls.Image;
+			import mx.controls.TextInput;
+			import mx.core.UIComponent;
+			import mx.events.ColorPickerEvent;
+			import mx.events.FlexEvent;
+			import mx.managers.PopUpManager;
+			
+			
+			///// 打开时传入参数 ///////////
+			public var imgId:int;				//图片id
+			public var selectFile:File;			//图片文件
+			public var relativePath:String;		//相对路径，标题用
+			public var imgLibXML:XML;			//库的xml对象，保存时需要回传
+			///////////////////////////////
+			
+			private var _cellWidth:int;	//一个网格的象素宽
+			private var _cellHeight:int;	//一个网格的象素高
+			//网格层大小
+			private var mapWidth:int;
+			private var mapHeight:int;
+			private var _gridLayer:GridLayer;	//网格层 
+			private var _roadPointLayer:RoadPointLayer; //路点层
+			
+			private var walkableArray:Array;	//boolean
+			private var shadowArray:Array;		//boolean
+			private var walkableImgArray:Array = new Array();	//bitmap
+			
+			private var brushBitmap:Bitmap;	//跟随光标用的
+			private var brushData:BitmapData;	
+						
+			private var baseDis:UIComponent;//基本UIComponent，为了后面可以直接add as3对象
+				
+			private var imgLoader:ImageLoader;	//显示图片的
+			private var img:Bitmap;
+
+			private var disScale:Number = 1;
+
+			private var gridWidth:Number;
+			private var gridHeight:Number;
+			
+			public var leftK:Number = 0;
+			public var rightK:Number = 0;
+			public var originX:Number = 0;
+			public var originY:Number = 0;
+		    //private var _slopeEditer:EditSlope = new EditSlope();
+			
+			[Embed(source="images/curs/roadHinder.png")]
+			private var cursorRoadHinder:Class;//点击设置障碍后的鼠标图片
+			
+			/*public function setSlope(leftSlope:Number, rightSlope:Number, originX:Number, originY:Number):void{
+				left_txt.text   = leftSlope.toString();
+				right_txt.text  = rightSlope.toString();
+				origin_txt.text = originX.toString() + "," + originY.toString();
+			}*/
+			
+			private function main():void
+			{
+				PopUpManager.centerPopUp(this);
+				this.title = "编辑建筑 -- " + this.relativePath;
+				init();
+			}
+			
+			private function init():void
+			{   
+				
+				this._cellWidth = this.parentApplication._cellWidth;
+				this._cellHeight = this.parentApplication._cellHeight;
+				
+				//基本UIComponent，为了后面vggg可以直接add as3对象
+				this.baseDis = new UIComponent();
+				this.workCanvas.addChild(this.baseDis);
+				
+				//_slopeEditer.editBuild = this;
+				//载入图片
+				this.imgLoader = new ImageLoader();
+				this.imgLoader.load(this.selectFile.url);
+				this.imgLoader.addEventListener(Event.COMPLETE, hLoadComplete);
+				this.setWalkableBtn.setFocus();
+				this.addEventListener(KeyboardEvent.KEY_DOWN, hKeyDown);
+			}
+			/**
+			 * 图像载入并刷新显示后调用
+			 */
+			private function hLoadComplete(event:Event):void
+			{    
+				img = new Bitmap(event.target.data);
+				img.x = this._cellWidth;
+				img.y = this._cellHeight;
+				this.baseDis.addChild(img);
+				//网格层大小
+				this.mapWidth = img.width + this._cellWidth * 2.5;
+				this.mapHeight = img.height + this._cellHeight * 2.5;
+				
+				gridWidth      = (img.width <= workCanvas.width)?workCanvas.width:mapWidth;
+				gridHeight     = (img.height <= workCanvas.height)?workCanvas.height:mapHeight;
+				
+				_gridLayer = new GridLayer();
+				_gridLayer.drawGrid(gridWidth, gridHeight, _cellWidth, _cellHeight);
+
+				_gridLayer = new GridLayer();
+				_gridLayer.drawGrid(gridWidth,gridHeight, _cellWidth, _cellHeight);
+				
+			    _roadPointLayer = new RoadPointLayer(_gridLayer);
+				_roadPointLayer.cellWidth = this._cellWidth;
+				_roadPointLayer.cellHeight = this._cellHeight;
+				_roadPointLayer.cellMark = RoadPointLayer.MARK_LINE_DIAMOND;
+				
+				//_slopeEditer.width  = gridWidth;
+				//_slopeEditer.height = gridHeight;
+
+				this.baseDis.addChild(_gridLayer);
+				this.baseDis.addChild(_roadPointLayer);
+				
+				this.workCanvas.addChild(this.baseDis);
+				
+				//workCanvas.addChild(_slopeEditer);
+
+				//笔刷
+				this.brushBitmap = new Bitmap();
+				this.baseDis.addChild(this.brushBitmap);
+				
+				//初始化数组
+				var cnt:int = this.mapWidth*this.mapHeight;
+				this.walkableArray = new Array(cnt);
+				for (var i:int=0; i<this.mapWidth*this.mapHeight; i++)
+				{
+					this.walkableArray[i] = false;
+				}
+				
+				//取出并设置以前保存的设置
+				this.restoreSaveData();
+			}
+			
+			/**
+			 * 取出并设置以前保存的设置
+			 */
+			protected function restoreSaveData():void
+			{ 
+				var itemXml:XML = this.imgLibXML.item.(@id==this.imgId)[0];
+						
+				/*var __left_k:Number = itemXml.walkable.@left_k;
+				var __right_k:Number= itemXml.walkable.@right_k;
+				var __origin_y:Number= itemXml.walkable.@origin_y;
+				var __origin_x:Number= itemXml.walkable.@origin_x;
+				
+				
+				var _leftX:Number = img.x; 
+				var _leftY:Number = __origin_y - (img.x - __origin_x)*__left_k;
+				
+				var _rightX:Number = img.x + img.width;
+				var _rightY:Number = __origin_y - ( img.x + img.width - __origin_x)*__right_k; 
+				
+
+				if(itemXml == "" ||itemXml.walkable.@origin_y ==undefined){
+					__origin_y = img.y + img.height;
+					origin_txt.text = "未设置";
+				}
+				if(itemXml == "" ||itemXml.walkable.@origin_x ==undefined){
+					__origin_x = img.width/2 + img.x;
+					origin_txt.text = "未设置";
+				} 
+				
+				if(itemXml == "" || itemXml.walkable.@left_k ==undefined){
+					__left_k = -0.176;
+					_leftX = img.x;
+					_leftY =  __origin_y - (img.x - __origin_x)*__left_k;
+					left_txt.text = "未设置";
+				}
+				if(itemXml == "" ||itemXml.walkable.@right_k ==undefined){
+					__right_k = 0.176;
+					_rightX = img.x + img.width;
+					_rightY = __origin_y - ( img.x + img.width - __origin_x)*__right_k;
+					right_txt.text = "未设置";
+				}
+
+				//if(_rightX<0)_rightX=_rightY/__right_k;
+								
+				if(_leftY < 0) {
+					var __lefX:Number = _leftY/__left_k;
+					_leftY = 0;
+					_leftX += __lefX;
+				}
+				if(_rightY < 0) {
+					var __rightX:Number = _rightY/__right_k;
+					_rightY = 0;
+					_rightX += __rightX;
+				}
+				if(_leftY > gridHeight){
+					var _lefWidth:Number = _leftY/__left_k;
+					_leftY = gridHeight;
+					_leftX += _lefWidth;
+					
+				}
+				if(_rightY > gridHeight){
+					var __rightW:Number = _leftY/__right_k;
+					_rightY = gridHeight;
+					_rightX += __rightW;
+				}
+				if(_leftX < 0){
+					var __leftY:Number = _leftX*__left_k;
+					_leftX = 0;
+					_leftY += __leftY;
+				}
+				if(_rightX >gridWidth){
+					var __rightY:Number = _rightX*__right_k;
+					_rightX = gridWidth;
+					_rightY +=__rightY;
+				}
+				_slopeEditer.imgLeft.x = _leftX;
+				_slopeEditer.imgLeft.y = _leftY;
+				_slopeEditer.leftK=__left_k
+				
+				_slopeEditer.imgRight.x = _rightX;
+				_slopeEditer.imgRight.y = _rightY;
+				_slopeEditer.rightK=__right_k
+					
+				_slopeEditer.imgOrigin.x = __origin_x;
+				_slopeEditer.imgOrigin.y = __origin_y;
+
+
+				_slopeEditer.originX=__origin_x
+				_slopeEditer.originY=__origin_y
+				
+				_slopeEditer.drawSlopeLine();
+				if (itemXml.@type != "building") return;	//以前从没有设置过该图片
+				
+				setSlope(__left_k,__right_k,__origin_y,__origin_x);*/
+
+				//取出以前编辑的数据 
+//				var walkableStr:String = itemXml.walkable;
+//				var wa:Array = walkableStr.split(",");
+//				var bm:Bitmap;
+//				var walkableBrushData:BitmapData = MapEditorUtils.getWalkableSignMap(this._cellWidth, this._cellHeight);
+//
+//				var ipos:int = 0;
+//				var pt:Point;
+//				//阻挡信息
+//				for (var m:int=0; m<wa.length && wa.length>1; m+=2)
+//				{
+//					//根据网格中心的像素坐标取出网格坐标
+//					pt = MapEditorUtils.getCellPoint(this._cellWidth, this._cellHeight, int(wa[m]), int(wa[m+1]));
+//					ipos = pt.y * this.mapWidth + pt.x;
+//					this.walkableArray[ipos] = true;
+//					
+//					_roadPointLayer.drawCell(pt.x, pt.y, MapEditorConstant.CELL_TYPE_HINDER);
+//					
+//				}
+//				//图片位置
+//				img.x = itemXml.@xoffset;
+//				img.y = itemXml.@yoffset;
+				
+			}
+			
+			
+			/**
+			 * w,a,s,d移动图片
+			 */
+			private function hKeyDown(event:KeyboardEvent):void
+			{
+				switch (event.keyCode)
+				{
+					case 65:	//a
+						if(img.x > (this._cellWidth/2 )) img.x -= 1;
+						break;
+					case 87:	//w
+						if(img.y > (this._cellHeight/2 )) img.y -= 1;
+						break;
+					case 68:	//d
+						if(img.x < (gridWidth-img.width - this._cellWidth/2 )) img.x += 1;
+						break;
+					case 83:	//s
+						if(img.y <( gridHeight-img.height - this._cellHeight/2 )) img.y += 1;
+						break;
+				}
+			}
+
+			/**
+			 * 设置阻挡和阴影
+			 */
+			private function hSetBtn(event:Event):void
+			{
+				var btn:Button = Button(event.target);
+				if (btn.selected == true)
+				{
+					if (btn.id == "setWalkableBtn")
+					{
+
+	             		//this.cursorManager.setCursor(cursorRoadHinder);
+	             		this.brushData = MapEditorUtils.getWalkableSignMap(this._cellWidth, this._cellHeight);
+						this.brushBitmap.bitmapData = this.brushData;
+	             		
+					} 
+					
+					
+					this.workCanvas.addEventListener(MouseEvent.MOUSE_MOVE, hMouseMove);
+					this.workCanvas.addEventListener(MouseEvent.CLICK, hMouseClick);
+					this.workCanvas.addEventListener(MouseEvent.RIGHT_CLICK, hMouseRightClick);
+				} else {
+					this.brushBitmap = null;
+					this.workCanvas.removeEventListener(MouseEvent.MOUSE_MOVE, hMouseMove);
+					this.workCanvas.removeEventListener(MouseEvent.CLICK, hMouseClick);
+					this.workCanvas.removeEventListener(MouseEvent.RIGHT_CLICK, hMouseRightClick);
+				}
+			}
+			
+
+			
+			/**
+			 * 鼠标移动
+			 */
+			private function hMouseMove(event:MouseEvent):void
+			{
+				var pt:Point = MapEditorUtils.getCellPoint(this._cellWidth, this._cellHeight, 
+										_gridLayer.mouseX, _gridLayer.mouseY);
+				var px:int = pt.x * this._cellWidth + (pt.y & 1) * this._cellWidth / 2;
+				var py:int = pt.y * this._cellHeight / 2;
+				this.brushBitmap.x = px;
+				this.brushBitmap.y = py;
+			}
+			/**
+			 * 鼠标点击
+			 */
+			private function hMouseClick(event:MouseEvent):void
+			{
+				var pt:Point = MapEditorUtils.getCellPoint(this._cellWidth, this._cellHeight, 
+										_gridLayer.mouseX, _gridLayer.mouseY);
+				
+				var iposition:int = pt.y * this.mapWidth + pt.x;
+				var bm:Bitmap;
+				if (this.setWalkableBtn.selected == true)
+				{
+					if (this.walkableArray[iposition] == false)
+					{
+						_roadPointLayer.drawCell(pt.x, pt.y, MapEditorConstant.CELL_TYPE_HINDER);
+				
+						this.walkableArray[iposition] = true;
+						this.walkableImgArray[iposition] = bm;
+					}
+				} 
+			}
+
+			/**
+			 * 鼠标右键点击
+			 */
+			private function hMouseRightClick(event:MouseEvent):void
+			{
+				var pt:Point = MapEditorUtils.getCellPoint(this._cellWidth, this._cellHeight, 
+									_gridLayer.mouseX, _gridLayer.mouseY);
+				var px:int = pt.x * this._cellWidth + (pt.y & 1) * this._cellWidth / 2;
+				var py:int = pt.y * this._cellHeight / 2;
+				
+				var iposition:int = pt.y * this.mapWidth + pt.x;
+				
+				if (this.setWalkableBtn.selected == true)
+				{
+					if (this.walkableArray[iposition] == true)
+					{
+						this.walkableArray[iposition] = false;
+						_roadPointLayer.resetCell(pt.x, pt.y);
+					}
+				} 
+			}
+			
+			/**
+			 * 显示/隐藏 网格
+			 */
+			private function hCilckShowGridBtn():void
+			{
+				if (_gridLayer.visible)
+				{
+					_gridLayer.visible = false;
+				} else {
+					_gridLayer.visible = true;
+				}
+			}
+			
+
+			/**
+			 * 保存
+			 */
+			private function hSaveBtn():void
+			{
+//				var xmlItem:XML = this.imgLibXML.item.(@id==this.imgId)[0];
+				
+//				//阻挡和阴影信息字符串, 偶数索引为x, 奇数索引为y
+//				var pt:Point;
+//				var walkableStr:String = null;
+//				var shadowStr:String = null;
+//				for (var i:int=0; i<this.mapHeight; i++)
+//				{
+//					for (var j:int=0; j<this.mapWidth; j++)
+//					{
+//						//网格中心的像素坐标 
+//						pt = MapEditorUtils.getPixelPoint(this._cellWidth, this._cellHeight, j, i);
+//						
+//						if (this.walkableArray[i*this.mapWidth + j] == true)
+//						{
+//							if (walkableStr == null)
+//							{
+//								walkableStr = pt.x + "," + pt.y;
+//							} else {
+//								walkableStr += "," + pt.x + "," + pt.y;
+//							}
+//						}
+//					}
+//				}
+//				
+//				//删除以前的阻挡和阴影信息
+//				delete xmlItem.walkable;
+//				
+//				//新的阻挡和阴影信息
+//				if (walkableStr != null)
+//				{
+//					xmlItem.appendChild(<walkable>{walkableStr}</walkable>);
+//				}
+//				
+//				xmlItem.@type = "building";
+//				xmlItem.@xoffset = img.x;
+//				xmlItem.@yoffset = img.y;
+
+				/*xmlItem.walkable.@left_k   = _slopeEditer.leftK;
+				xmlItem.walkable.@right_k  = _slopeEditer.rightK;
+				xmlItem.walkable.@origin_x = _slopeEditer.originX;
+				xmlItem.walkable.@origin_y = _slopeEditer.originY;*/
+//				this.imgLibXML.item.(@id == this.imgId)[0] = xmlItem.copy();
+//
+				var e:MapEditorEvent = new MapEditorEvent(MapEditorEvent.EDIT_BUILD_SUBMIT);
+//				e.buildXml = imgLibXML.copy();
+//				e.nowBuildXML = xmlItem.copy();
+				dispatchEvent(e);
+				
+				this.cursorManager.removeAllCursors();
+				//关闭
+				this.closeWindow();
+			}
+
+			
+			/**
+			 * 得到阻挡和阴影笔刷图片
+			 */
+			private function getSignData(tx:int, ty:int, bd:BitmapData):Bitmap
+			{
+				var px:int = tx * this._cellWidth + (ty & 1) * this._cellWidth / 2;
+				var py:int = ty * this._cellHeight / 2;
+				
+				var bm:Bitmap = new Bitmap(bd);
+				bm.x = px;
+				bm.y = py;
+				return bm;
+			}
+			
+			/**
+			 * 关闭 窗口
+			 */
+			private function closeWindow():void
+			{
+				if(!this.parentApplication._gridLayer.visible)
+					this.parentApplication._gridLayer.visible = true;
+				if(!this.parentApplication._mapLayer.visible)
+					this.parentApplication._mapLayer.visible = true;
+				this.cursorManager.removeAllCursors();
+				PopUpManager.removePopUp(this);
+			//	HeptaFishGC.gc();
+			}
+		]]>
+	</mx:Script>
+	<mx:Canvas id="workCanvas" backgroundColor="#ffffff" backgroundAlpha="0.1" left="10" top="72" right="100" bottom="14" horizontalScrollPolicy="auto" verticalScrollPolicy="auto" width="550" height="500" enabled="true">
+	</mx:Canvas>
+	<mx:Button x="534" y="393" label="取 消" click="closeWindow();" fontWeight="normal" fontSize="12" width="75"/>
+	<mx:Button click="{hSaveBtn();}" x="534" y="345" label="保 存" fontSize="12" fontWeight="normal" width="75"/>
+	<mx:Button id="setWalkableBtn" click="hSetBtn(event)" x="534" y="93" label="设置障碍" fontSize="12" fontWeight="normal" toggle="true" toolTip="左键设置，右键清除"/>
+	<mx:Button id="showGridBtn" click="hCilckShowGridBtn();" x="534" y="139" label="显示网格" fontWeight="normal" fontSize="12" toolTip="隐藏/显示网格层"/>
+	<mx:Label x="10" y="42" text="w,a,s,d控制图片微调  设置障碍时，单击鼠标左键，设置障碍点，单击鼠标右键，取消障碍点" width="550" color="#EC0627"/>
+	<!--<mx:Text x="525" y="197" text="文本" width="78" id="left_txt"/>
+	<mx:Text x="525" y="249" text="文本" width="74" id="right_txt"/>
+	<mx:Text x="525" y="305" text="文本" width="84" id="origin_txt"/>
+	<mx:Label x="522" y="171" text="左斜率：" width="91"/>
+	<mx:Label x="522" y="223" text="右斜率：" width="90"/>
+	<mx:Label x="522" y="276" text="原点X,Y坐标：" width="100"/>-->
+</mx:Panel>

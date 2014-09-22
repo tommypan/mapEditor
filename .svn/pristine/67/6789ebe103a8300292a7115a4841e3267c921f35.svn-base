@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Panel xmlns:fx="http://ns.adobe.com/mxml/2009"
+		 xmlns:s="library://ns.adobe.com/flex/spark"
+		 xmlns:mx="library://ns.adobe.com/flex/mx"
+		 width="363" height="324" initialize="init(event)">
+	
+	<fx:Script>
+		<![CDATA[
+			import mapeditor.events.MapEvent;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.events.FlexEvent;
+			
+			import spark.events.IndexChangeEvent;
+			
+			[Bindable]
+			private var areaInfo:ArrayCollection = new ArrayCollection([
+				{label:"矩形"},
+				{label:"圆形"},
+			]);
+			
+			[Bindable]
+			private var npcInfo:ArrayCollection = new ArrayCollection([
+				{label:"黑熊精"},
+				{label:"人蛇妖"},
+				{label:"蝎子精"},
+			]);
+			
+			private var areaType :String;
+			private var npcType :String;
+			
+			private function enter(event:MouseEvent):void
+			{
+				var ob :Object = new Object();
+				//				var twwen :Tween = new Tween();
+				//				Animation
+				if(areaType == "rectangle"){
+					if(!areaName.text ) Alert.show("未输入怪物名称");
+					if(!areaWidth.text) Alert.show("未输入刷怪范围宽度");
+					if(!areaHeight.text)Alert.show("未输入刷怪范围长度");
+					if(!areaID.text) Alert.show("未输入怪物ID");
+					if(!npcID.text) Alert.show("未输入npcID");
+					if(!npcNum.text) Alert.show("未输入npc数量");
+					if(!npcName.text) Alert.show("未输入npc姓名");
+					
+					if(int(areaWidth.text) == 0 ) Alert.show("刷怪范围宽度只能输入数字");
+					if(int(areaHeight.text) == 0 ) Alert.show("刷怪范围长度只能输入数字");
+					
+					if(npcID.text && npcNum.text && npcName && areaName.text && int(areaWidth.text) !=0  && int(areaHeight.text) != 0 && areaID.text)
+					{
+						removeAllElements();
+					
+						ob.areaName =areaName.text;
+						ob.areaWidth = areaWidth.text;
+						ob.areaHeight = areaHeight.text;
+						ob.areaID = areaID.text;
+						ob.npcID = npcID.text;
+						ob.npcNum = npcNum.text;
+						//ob.npcType = npcType;
+						ob.npcType = npcName.text;
+						ob.areaType ="rectangle";
+						MapEvent.dispatcher.dispatchEvent(new MapEvent(MapEvent.NPC_PANEL_PRESS_OK,ob));
+						
+					}
+				}else if(areaType == "circle"){
+					if(!areaName.text ) Alert.show("未输入怪物名称");
+					if(!areaRadius.text) Alert.show("未输入怪物活动半径");
+					if(!areaID.text) Alert.show("未输入怪物ID");
+					if(!npcID.text) Alert.show("未输入npcID");
+					if(!npcNum.text) Alert.show("未输入npc数量");
+					if(!npcName.text) Alert.show("未输入npc姓名");
+					
+					if(int(areaRadius.text) == 0) Alert.show("怪物活动半径只能为数字");
+					if(npcID.text && npcNum.text && npcName && areaName.text && int(areaRadius.text) !=0  && areaID.text)
+					{
+						
+						
+						removeAllElements();
+						
+						ob.areaName =areaName.text;
+						ob.areaRadius = areaRadius.text;
+						ob.areaID = areaID.text;
+						ob.npcID = npcID.text;
+						ob.npcNum = npcNum.text;
+						//ob.npcType = npcType;
+						ob.npcType = npcName.text;
+						ob.areaType ="circle";
+						MapEvent.dispatcher.dispatchEvent(new MapEvent(MapEvent.NPC_PANEL_PRESS_OK,ob));
+						
+					}
+				}
+			}
+			
+			protected function cancel(event:MouseEvent):void
+			{
+				
+				MapEvent.dispatcher.dispatchEvent( new Event(MapEvent.NPC_PANEL_PRESS_CANCEL));
+				
+			}
+			
+			private function areaChangeHandle(event:Event):void
+			{
+				if(areaChooser.selectedIndex == 0)
+				{
+					areaType = "rectangle";
+					areaHeight.editable = true;
+					areaWidth.editable = true;
+					areaRadius.editable = false;
+				}else if(areaChooser.selectedIndex == 1){
+					areaType = "circle";
+					areaHeight.editable = false;
+					areaWidth.editable = false;
+					areaRadius.editable = true;
+				}
+				
+			}
+			
+			protected function npcChangeHandle(event:IndexChangeEvent):void
+			{
+				if(npcChooser.selectedIndex == 0)
+				{
+					npcType = "黑熊精";
+				}else if(npcChooser.selectedIndex == 1){
+					npcType = "人蛇妖";
+					
+				}else if(npcChooser.selectedIndex == 2){
+					npcType = "蝎子精";
+				}
+				
+				
+			}
+			
+			protected function init(event:FlexEvent):void
+			{
+				areaHeight.editable = false;
+				areaWidth.editable = false;
+				areaRadius.editable = false;
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+		
+	</fx:Declarations>
+	<s:TextInput id="areaName" x="9" y="92" />
+	<s:Button x="186" y="238" label="确定" click="enter(event)"/>
+	<s:TextInput id="areaRadius"  x="199" y="51"/>
+	<s:TextInput id="areaID" x="9" y="180"/>
+	<s:Button id="cancelButton" x="33" y="239" label="取消" click="cancel(event)"/>
+	<s:TextInput id="areaHeight" x="5" y="51" width="44" height="20"/>
+	<s:TextInput id="areaWidth" x="103" y="51" width="44" height="20"/>
+	<s:DropDownList id="areaChooser" x="5" y="10" dataProvider="{areaInfo}" change="areaChangeHandle(event)" ></s:DropDownList>
+	<s:Label x="121" y="10" width="79" height="21" text="设置刷怪地形"/>
+	<s:Label x="55" y="52" width="57" height="20" text="地形长度"/>
+	<s:Label x="153" y="52" width="52" height="20" text="地形宽度"/>
+	<s:Label x="307" y="53" width="55" height="20" text="地形半径"/>
+	<s:Label x="123" y="93" width="76" height="20" text="地形姓名"/>
+	<s:Label x="120" y="179" width="73" height="23" text="地形ID"/>
+	<s:Label x="298" y="12" width="48" height="20" text="怪物type"/>
+	<s:TextInput id="npcID" x="199" y="135" width="85" height="21"/>
+	<s:TextInput id="npcNum" x="199" y="178" width="84" height="23"/>
+	<s:Label x="298" y="135" width="36" height="21" text="怪物ID"/>
+	<s:Label x="296" y="179" width="54" height="23" text="怪物num"/>
+	<s:DropDownList id="npcChooser" x="198" y="11" width="96" dataProvider="{npcInfo}" change="npcChangeHandle(event)"></s:DropDownList>
+	<s:TextInput id="npcName" x="199" y="93"/>
+	<s:Label x="314" y="93" width="32" height="20" text="怪物名"/>
+</s:Panel>

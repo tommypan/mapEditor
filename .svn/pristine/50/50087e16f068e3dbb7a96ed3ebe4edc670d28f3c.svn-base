@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:mx="http://www.adobe.com/2009/mxml" initialize="{initSlopeEditor()}" >
+	<mx:Script>
+		<![CDATA[
+			//width="800" height="800" 
+			import mapeditor.layers.DragRect;
+			
+			import flash.events.Event;
+			import flash.events.MouseEvent;
+			import flash.net.URLRequest;
+			
+			import mx.core.UIComponent;
+			
+			public var leftK:Number = 0;
+			public var rightK:Number = 0;
+			public var originX:Number = 0;
+			public var originY:Number = 0;
+			public var imgLeft:DragRect;
+			public var imgRight:DragRect;
+			public var imgOrigin:DragRect;
+			public var editBuild:EditBuild;
+			
+			protected function initSlopeEditor():void{
+				
+				imgLeft = new DragRect();
+				imgRight = new DragRect();
+				imgOrigin = new DragRect();
+				
+				canvas.addChild(imgLeft);
+				canvas.addChild(imgRight);
+				canvas.addChild(imgOrigin);
+				
+				imgRight.addEventListener(MouseEvent.MOUSE_DOWN,onDrag);
+				imgLeft.addEventListener(MouseEvent.MOUSE_DOWN,onDrag);
+				imgOrigin.addEventListener(MouseEvent.MOUSE_DOWN,onDrag);
+				
+				
+				imgRight.addEventListener(MouseEvent.MOUSE_UP,onStopDrag);
+				imgLeft.addEventListener(MouseEvent.MOUSE_UP,onStopDrag);
+				imgOrigin.addEventListener(MouseEvent.MOUSE_UP,onStopDrag);
+				
+				drawSlopeLine();
+
+				
+			}
+			
+			public function drawSlopeLine():void{
+				var rightPoint:Point = new Point(imgRight.x,imgRight.y);
+				var leftPoint:Point = new Point(imgLeft.x,imgLeft.y);
+				var originPoint:Point = new Point(imgOrigin.x,imgOrigin.y);
+				
+				canvas.graphics.clear();
+				canvas.graphics.lineStyle(1,0x000000);
+				
+				canvas.graphics.moveTo(originPoint.x,originPoint.y);
+				canvas.graphics.lineTo(leftPoint.x,leftPoint.y);
+				
+				canvas.graphics.moveTo(originPoint.x,originPoint.y);
+				canvas.graphics.lineTo(rightPoint.x,rightPoint.y);
+			}
+
+			protected function getResult():void{
+				var originO:Point = new Point(0,0);
+			    var leftPointO:Point = new Point(imgLeft.x - imgOrigin.x, -(imgLeft.y-imgOrigin.y));
+			    var righpPointO:Point = new Point(imgRight.x - imgOrigin.x,-(imgRight.y - imgOrigin.y));
+
+			    leftK = (originO.y - leftPointO.y)/(originO.x - leftPointO.x);
+			    rightK = (originO.y - righpPointO.y)/(originO.x - righpPointO.x);
+				originX = imgOrigin.x;
+				originY = imgOrigin.y;
+				
+				leftK = int(leftK*100)/100;
+				rightK = int(rightK*100)/100;
+			}
+			protected function onDrag(e:MouseEvent):void{
+			    e.currentTarget.startDrag();
+				addEventListener(Event.ENTER_FRAME,updateLine);
+				
+		    }
+			protected function onStopDrag(e:MouseEvent):void
+			{
+				e.currentTarget.stopDrag();
+				removeEventListener(Event.ENTER_FRAME,updateLine);
+				getResult();
+			}
+		 protected function updateLine(e:Event):void{
+				var newEvt:MouseEvent;
+				if(imgLeft.x>imgOrigin.x - 1){
+					imgLeft.x = imgOrigin.x -1;
+				imgLeft.stopDrag();		
+					removeEventListener(Event.ENTER_FRAME,updateLine);
+				}
+               if(imgRight.x<imgOrigin.x + 1){
+					imgRight.x = imgOrigin.x +1;
+					imgRight.stopDrag();
+					removeEventListener(Event.ENTER_FRAME,updateLine);
+				}
+				//e.currentTarget.x = this.mouseX;
+				//e.currentTarget.y = this.mouseY;
+				
+				var rightPoint:Point = new Point(imgRight.x,imgRight.y);
+				var leftPoint:Point = new Point(imgLeft.x,imgLeft.y);
+				var originPoint:Point = new Point(imgOrigin.x, imgOrigin.y);
+				
+				canvas.graphics.clear();
+				canvas.graphics.lineStyle(1,0x000000);
+				
+				canvas.graphics.moveTo(originPoint.x,originPoint.y);
+				canvas.graphics.lineTo(leftPoint.x,leftPoint.y);
+				
+				canvas.graphics.moveTo(originPoint.x,originPoint.y);
+				canvas.graphics.lineTo(rightPoint.x,rightPoint.y);
+				
+				getResult();
+				editBuild.setSlope(leftK, rightK, originPoint.x, originPoint.y);
+		
+			}
+			// width="100%" height="100%"
+		]]>
+	</mx:Script>	
+	<mx:Canvas id="canvas" horizontalScrollPolicy="off" verticalScrollPolicy="off" >
+	</mx:Canvas>
+</mx:Canvas>

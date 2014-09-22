@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config>
+	<param name="server" value="localhost" />
+	<param name="serverPort" value="8081" />
+	<param name="imageLibType" value="file" />
+	
+	<resources dec="resources">
+		<!--<classParam name="eleStore" url="data/eleStore.swf"/>-->
+	</resources>
+</config>

@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Panel xmlns:mx="http://www.adobe.com/2006/mxml" layout="absolute" 
+	width="612" height="442" creationComplete="initPanel(event)" 
+	removedEffect="{removeEffect}" creationCompleteEffect="{showEffect}">
+
+	<mx:Script>
+		<![CDATA[
+			import mapeditor.utils.GloabelVeriables;
+			
+			import flash.net.URLLoader;
+			import flash.net.URLLoaderDataFormat;
+			import flash.net.URLRequestMethod;
+			import flash.net.navigateToURL;
+			
+			import mx.managers.PopUpManager;
+			import mx.skins.ProgrammaticSkin;
+			
+			private var serverFlag:String           = GloabelVeriables.SERVER_FLAG;
+			private var version:String              = GloabelVeriables.VERSION;
+			[Bindable]private var versionStr:String = 'MapEditor ';
+			
+			private var urlLoader:URLLoader  = new URLLoader();
+			
+			private function initPanel(evet:Event):void{
+		
+				doubleClickEnabled = true;
+				addEventListener(MouseEvent.DOUBLE_CLICK, closePanel);
+			}
+			
+			
+			private function closePanel(evet:Event):void{
+				removeEventListener(MouseEvent.DOUBLE_CLICK,closePanel);
+				doubleClickEnabled = false;
+				
+				PopUpManager.removePopUp(this);
+			}
+			
+			
+			private function clickToUrl(urlStr:String):void{
+				var urlStr:String = urlStr;
+				var url:URLRequest = new URLRequest(urlStr);
+				navigateToURL(url, "_blank");
+				
+			}		
+		]]>
+	</mx:Script>
+	
+	<mx:Fade alphaFrom="1" alphaTo="0" duration="1000" id="removeEffect" />
+	<mx:Fade alphaFrom="0" alphaTo="1" duration="1000" id="showEffect" />
+	<mx:Rotate duration="1500" originX="{logo.width/2+1.5}" originY="{logo.height/2+4}" id="imageShow" />
+
+	<mx:Text x="293" y="74" text="{versionStr}" height="35" fontFamily="Times New Roman" fontSize="20" color="#32B1CC"/>
+	<mx:Text x="171" y="146" text="技术开发：" fontFamily="Times New Roman" fontSize="12" height="21"/>
+	<mx:Text x="171" y="115" text="策划&amp;产品：重庆邮电大学数字媒体协会" fontFamily="Times New Roman" fontSize="12"/>
+	<mx:Text x="171" y="175" text="技术支持：" fontFamily="Times New Roman" fontSize="12"/>
+	<mx:Image id="logo" creationCompleteEffect="{imageShow}" source="@Embed(source='images/logo.png')" y="70" x="21"/>
+	<mx:Text x="161" y="68" text="CQ"  height="35" fontFamily="Georgia" fontSize="24" color="#006699" width="38"/>
+	<mx:Text x="237" y="70" text="PT"  height="35" fontFamily="Times New Roman" fontSize="24" color="#FF6600"/>
+	<mx:Text x="171" y="252" text="帮助&amp;反馈：" fontFamily="Times New Roman" fontSize="12"/>
+	<mx:LinkButton x="253" y="250" label="请点击此处"  click="clickToUrl('http://www.eb163.com/club/thread-14193-1-1.html')" fontSize="12" fontFamily="Times New Roman"/>
+	<mx:LinkButton x="366" y="173" label="http://www.eb163.com/"  click="clickToUrl('http://www.eb163.com/')" fontSize="12" fontFamily="Times New Roman"/>
+	<mx:LinkButton x="247" y="173" label="网页游戏开发网"  click="clickToUrl('http://www.eb163.com/')" fontSize="12" fontFamily="Times New Roman"/>
+	<mx:LinkButton x="264" y="206" label="天地会"  click="clickToUrl('http://bbs.9ria.com/forum.php')" fontSize="12" fontFamily="Times New Roman"/>
+	<mx:Text id="newVersion" selectable="true" x="171" y="281" width="292" height="109" htmlText="{GloabelVeriables.NEWS_INFO}" />
+	<mx:LinkButton x="366" y="206" label="http://bbs.9ria.com/forum.php" click="clickToUrl('http://bbs.9ria.com/forum.php')" fontSize="12" fontFamily="Times New Roman"/>
+	<mx:LinkButton x="247" y="144" label="重庆邮电大学数字媒体协会" click="clickToUrl('http://user.qzone.qq.com/709450846/infocenter/')" fontSize="12" fontFamily="Times New Roman"/>
+	<mx:Text x="207" y="57" fontFamily="Times New Roman" fontSize="38" text="u"/>
+</mx:Panel>

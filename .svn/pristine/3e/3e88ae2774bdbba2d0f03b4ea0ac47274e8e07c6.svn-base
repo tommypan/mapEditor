@@ -1,0 +1,69 @@
+
+/*
+//------------------------------
+//  Application
+//------------------------------
+*/
+Application {
+	backgroundColor: #666666;
+	fontStyle:normal;
+	fontFamily:arial;
+	fontWeight:normal;
+	fontSize:14;
+    background-size: "100%";
+	
+ }
+ 
+/*
+//------------------------------
+//  WindowedApplication
+//------------------------------
+*/
+WindowedApplication {
+	backgroundColor: #666666;
+	fontStyle:normal;
+	fontFamily:arial;
+	fontWeight:normal;
+	fontSize:12;
+    background-size: "100%";
+	
+ }
+
+/*
+//------------------------------
+//  ComboBox
+//------------------------------
+*/
+ComboBox
+{
+	backgroundAlpha: 0;
+}
+
+.myComboBoxDropDowns {
+
+	backgroundAlpha: 0;
+}
+
+/*
+//------------------------------
+//  Panel
+//------------------------------
+*/
+
+Panel
+{
+	color:#000000;
+	size:12;
+	
+}
+/**/
+/*
+//------------------------------
+//  Panel ControlBar
+//------------------------------
+*/
+ControlBar
+{
+	horizontalAlign: center;
+	paddingBottom: 14;
+}

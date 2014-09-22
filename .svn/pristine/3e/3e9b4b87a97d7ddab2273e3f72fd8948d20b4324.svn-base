@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Panel xmlns:mx="http://www.adobe.com/2009/mxml" layout="absolute" width="200" height="204" >
+	
+<mx:Script>
+  <![CDATA[
+
+            //Writed by Aslan
+
+            import mx.controls.LinkButton;
+            import flash.events.MouseEvent;
+            
+            private var maxClick:LinkButton;
+
+            
+
+            //下面的两个重载过的函数会在视图生成的时候自动执行
+
+            override protected function createChildren():void
+           {
+                 super.createChildren();
+             
+                 maxClick = new LinkButton;
+                 maxClick.label = "Maximize";
+                 maxClick.addEventListener(MouseEvent.CLICK, toMaxHandler);
+                 titleBar.addChild(maxClick);
+             
+            }
+         
+            override protected function updateDisplayList (unscaledWidth:Number, unscaledHeight:Number):void
+           {
+                 super.updateDisplayList(unscaledWidth, unscaledHeight);
+    
+                 maxClick.setActualSize( maxClick.getExplicitOrMeasuredWidth(),
+                        maxClick.getExplicitOrMeasuredHeight() );
+    
+                 var y:int = 4;
+                 var x:int = this.width - maxClick.width - 12;
+                 maxClick.move(x, y);
+
+             } 
+             
+
+             //点击linkbutton后的触发函数
+             private function toMaxHandler(event:MouseEvent):void
+            {
+                 if(maxClick.label == "Maximize")
+                 {
+                       dispatchEvent(new Event("maxTalkBrowse"));
+                       maxClick.label = "Minimize";
+                 }
+                 else if(maxClick.label == "Minimize")
+                 {
+                       dispatchEvent(new Event("miniTalkBrowse"));
+                       maxClick.label = "Maximize";
+                 }
+            }
+
+         ]]>
+      </mx:Script>
+
+      <!--定义事件，便于此Panel触发后，被其父容器捕获-->
+
+      <mx:Metadata>
+          [Event(name = "maxTalkBrowse")]
+          [Event(name = "miniTalkBrowse")]
+      </mx:Metadata>
+
+</mx:Panel>
+
